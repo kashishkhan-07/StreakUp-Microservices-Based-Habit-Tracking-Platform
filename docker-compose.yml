@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # MongoDB Server (Hosts our 4 isolated microservice databases)
+  mongodb:
+    image: mongo:7.0
+    container_name: streakup-mongodb
+    restart: always
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - streakup-network
+
+  # RabbitMQ Message Broker with Management Web Dashboard
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: streakup-rabbitmq
+    restart: always
+    ports:
+      - '5672:5672'      # AMQP protocol port for backend services
+      - '15672:15672'    # RabbitMQ Management Web UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - streakup-network
+
+networks:
+  streakup-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
+    driver: local
