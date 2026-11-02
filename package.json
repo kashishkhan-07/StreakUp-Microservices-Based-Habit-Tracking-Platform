@@ -4,18 +4,17 @@
   "description": "StreakUp - Microservices-Based Habit Tracking Platform",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "services/*"
-  ],
   "scripts": {
+    "dev:all": "npx concurrently -n \"GATEWAY,AUTH,HABITS,ANALYTICS,NOTIFY\" -c \"cyan,magenta,green,yellow,blue\" \"npm run gateway\" \"npm run auth\" \"npm run habits\" \"npm run analytics\" \"npm run notifications\"",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "gateway": "npm --workspace=services/api-gateway run dev",
-    "auth": "npm --workspace=services/auth-service run dev",
-    "habits": "npm --workspace=services/habit-service run dev",
-    "analytics": "npm --workspace=services/analytics-service run dev",
-    "notifications": "npm --workspace=services/notification-service run dev"
+    "gateway": "npm --prefix services/api-gateway run dev",
+    "auth": "npm --prefix services/auth-service run dev",
+    "habits": "npm --prefix services/habit-service run dev",
+    "analytics": "npm --prefix services/analytics-service run dev",
+    "notifications": "npm --prefix services/notification-service run dev",
+    "client": "npm --prefix frontend run dev"
   },
   "repository": {
     "type": "git",
@@ -33,5 +32,8 @@
   "bugs": {
     "url": "https://github.com/kashishkhan-07/StreakUp-Microservices-Based-Habit-Tracking-Platform/issues"
   },
-  "homepage": "https://github.com/kashishkhan-07/StreakUp-Microservices-Based-Habit-Tracking-Platform#readme"
+  "homepage": "https://github.com/kashishkhan-07/StreakUp-Microservices-Based-Habit-Tracking-Platform#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  }
 }
