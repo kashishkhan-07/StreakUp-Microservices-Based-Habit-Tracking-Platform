@@ -1,7 +1,7 @@
 import { Habit } from '../models/Habit.js';
 import { Completion } from '../models/Completion.js';
 import { publishEvent } from '../events/rabbitMQPublisher.js';
-import { createHabitCompletedEvent, ROUTING_KEYS } from '../../../../shared/event-contracts/habitEvents.js';
+import { createHabitCompletedEvent, createHabitCreatedEvent, ROUTING_KEYS } from '../../../../shared/event-contracts/habitEvents.js';
 
 export class HabitService {
   // Get all active habits for a user, enriched with completion status
@@ -36,8 +36,13 @@ export class HabitService {
       negativeHabits,
       metrics: {
         totalActive: habits.length,
+        activeHabits: habits.length,
         completedToday: todayCompletions.length,
         leftToday: Math.max(0, habits.length - todayCompletions.length),
+        todayProgress:
+          habits.length > 0
+            ? Math.round((todayCompletions.length / habits.length) * 100)
+            : 0,
         progressPercentage:
           habits.length > 0
             ? Math.round((todayCompletions.length / habits.length) * 100)
@@ -48,10 +53,29 @@ export class HabitService {
 
   // Create a new habit
   static async createHabit(userId, habitData) {
-    return await Habit.create({
+    const habit = await Habit.create({
       userId,
       ...habitData,
     });
+
+    // 🚀 Publish HabitCreated event to RabbitMQ
+    try {
+      if (typeof publishEvent === 'function') {
+        const event = createHabitCreatedEvent({
+          habitId: habit._id.toString(),
+          userId,
+          habitTitle: habit.title,
+          habitCategory: habit.category || 'General',
+          frequency: habit.frequency || 'daily',
+        });
+        const routingKey = ROUTING_KEYS?.HABIT_CREATED || 'habit.created.v1';
+        publishEvent(routingKey, event);
+      }
+    } catch (eventErr) {
+      console.warn('⚠️ RabbitMQ habit.created publish skipped:', eventErr.message);
+    }
+
+    return habit;
   }
 
   // Update habit
@@ -118,6 +142,20 @@ export class HabitService {
         date,
       });
 
+      // Calculate context metrics for rich Duolingo-style notification
+      let totalCompletedToday = 1;
+      let habitTotalCompletions = 1;
+      try {
+        const [todayCount, lifetimeCount] = await Promise.all([
+          Completion.countDocuments({ userId, date }),
+          Completion.countDocuments({ habitId }),
+        ]);
+        totalCompletedToday = todayCount;
+        habitTotalCompletions = lifetimeCount;
+      } catch (countErr) {
+        console.warn('Metrics count warning:', countErr.message);
+      }
+
       // 🚀 Publish HabitCompleted event to RabbitMQ (Safe Non-blocking)
       try {
         if (typeof publishEvent === 'function') {
@@ -126,10 +164,25 @@ export class HabitService {
             habitId: habit._id.toString(),
             userId,
             date,
+            habitTitle: habit.title,
+            habitCategory: habit.category || 'General',
+            totalCompletedToday,
+            habitTotalCompletions,
+            streak: habitTotalCompletions,
           }) : {
             eventId: `evt_${Date.now()}`,
             eventType: 'habit.completed.v1',
-            payload: { completionId: completion._id, habitId, userId, date }
+            payload: {
+              completionId: completion._id,
+              habitId,
+              userId,
+              date,
+              habitTitle: habit.title,
+              habitCategory: habit.category,
+              totalCompletedToday,
+              habitTotalCompletions,
+              streak: habitTotalCompletions,
+            }
           };
 
           const routingKey = ROUTING_KEYS?.HABIT_COMPLETED || 'habit.completed.v1';

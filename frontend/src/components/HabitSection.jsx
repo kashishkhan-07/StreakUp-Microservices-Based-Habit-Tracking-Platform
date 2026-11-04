@@ -176,9 +176,7 @@ export default function HabitSection({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Are you sure you want to delete "${habit.title}"?`)) {
-                              onDelete(habit._id || habit.id);
-                            }
+                            onDelete(habit._id || habit.id, habit.title);
                           }}
                           title="Delete habit"
                           className="flex items-center gap-1 px-2 py-0.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-md transition"

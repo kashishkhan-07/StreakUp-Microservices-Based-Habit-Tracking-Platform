@@ -12,8 +12,10 @@ import {
   TrendingUp,
   Calendar
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function GoalsView({ habits = [], analytics = {} }) {
+  const { toast, showConfirm } = useToast();
   const [goals, setGoals] = useState(() => {
     const saved = localStorage.getItem('streakup_custom_goals');
     if (saved) {
@@ -79,13 +81,24 @@ export default function GoalsView({ habits = [], analytics = {} }) {
     };
 
     setGoals([newGoal, ...goals]);
+    toast.success(`Milestone "${newTitle.trim()}" created! 🎯`);
     setNewTitle('');
     setNewTarget(15);
     setModalOpen(false);
   };
 
-  const handleDeleteGoal = (id) => {
-    setGoals(goals.filter((g) => g.id !== id));
+  const handleDeleteGoal = (id, goalTitle) => {
+    showConfirm({
+      title: 'Remove Goal?',
+      message: `Are you sure you want to delete "${goalTitle || 'this milestone'}"?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      isDestructive: true,
+      onConfirm: () => {
+        setGoals((prev) => prev.filter((g) => g.id !== id));
+        toast.info('Milestone goal removed.');
+      },
+    });
   };
 
   const handleIncrement = (id) => {
@@ -93,10 +106,16 @@ export default function GoalsView({ habits = [], analytics = {} }) {
       goals.map((g) => {
         if (g.id !== id) return g;
         const nextCount = Math.min(g.targetDays, g.currentDays + 1);
+        const isNowDone = nextCount >= g.targetDays;
+        if (isNowDone && !g.completed) {
+          toast.success(`🏆 Milestone Achieved: ${g.title}! Outstanding consistency!`);
+        } else {
+          toast.info(`Logged 1 day for "${g.title}" (${nextCount}/${g.targetDays})`);
+        }
         return {
           ...g,
           currentDays: nextCount,
-          completed: nextCount >= g.targetDays,
+          completed: isNowDone,
         };
       })
     );
@@ -216,8 +235,8 @@ export default function GoalsView({ habits = [], analytics = {} }) {
                 </div>
 
                 <button
-                  onClick={() => handleDeleteGoal(goal.id)}
-                  className="text-slate-300 hover:text-red-500 p-1.5 rounded-xl hover:bg-slate-50 transition-colors"
+                  onClick={() => handleDeleteGoal(goal.id, goal.title)}
+                  className="text-slate-300 hover:text-rose-500 p-1.5 rounded-xl hover:bg-slate-50 transition-colors"
                   title="Remove goal"
                 >
                   <Trash2 className="w-4 h-4" />

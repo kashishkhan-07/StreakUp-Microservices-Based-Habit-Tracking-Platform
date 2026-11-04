@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import {
   Eye,
   EyeOff,
@@ -15,6 +16,7 @@ import {
 
 export default function AuthPage() {
   const { login, register } = useAuth();
+  const { toast } = useToast();
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -55,15 +57,18 @@ export default function AuthPage() {
     try {
       if (isRegister) {
         await register(name, email, password);
+        toast.success(`Welcome to StreakUp, ${name}! 🚀`);
       } else {
         await login(email, password);
+        toast.success('Signed in successfully! 👋');
       }
     } catch (err) {
-      setError(
+      const msg =
         err.response?.data?.message ||
         err.response?.data?.errors?.[0] ||
-        'Authentication failed. Please check your credentials.'
-      );
+        'Authentication failed. Please check your credentials.';
+      setError(msg);
+      toast.error(msg, isRegister ? 'Registration Failed' : 'Sign In Failed');
     } finally {
       setLoading(false);
     }

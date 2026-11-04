@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import UserAvatar from './UserAvatar';
 
 export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose, unreadCount = 0 }) {
   const { logout, user } = useAuth();
@@ -103,20 +104,38 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose, unre
         </div>
 
         {/* Bottom Actions */}
-        <div className="pt-6 border-t border-slate-100 space-y-1">
+        <div className="pt-5 border-t border-slate-100 space-y-1.5">
+          {user && (
+            <div
+              onClick={() => handleNavClick('settings')}
+              className="flex items-center gap-3 p-2 rounded-2xl hover:bg-slate-50 transition cursor-pointer group"
+              title="Open Settings"
+            >
+              <UserAvatar user={user} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-slate-800 truncate group-hover:text-blue-600 transition">
+                  {user.name}
+                </p>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => handleNavClick('settings')}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-semibold text-sm transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-semibold text-xs transition-colors"
           >
-            <Settings className="w-5 h-5 text-slate-400" />
+            <Settings className="w-4 h-4 text-slate-400" />
             <span>Settings</span>
           </button>
           {user && (
             <button
               onClick={() => { logout(); if (onClose) onClose(); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:text-red-600 hover:bg-red-50 font-semibold text-sm transition-colors"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 hover:text-red-600 hover:bg-red-50 font-semibold text-xs transition-colors"
             >
-              <LogOut className="w-5 h-5 text-slate-400" />
+              <LogOut className="w-4 h-4 text-slate-400" />
               <span>Logout</span>
             </button>
           )}

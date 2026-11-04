@@ -126,7 +126,7 @@ export class AuthService {
 
     if (name) user.name = name;
     if (timezone) user.timezone = timezone;
-    if (avatar) user.avatar = avatar;
+    if (avatar !== undefined) user.avatar = avatar;
 
     await user.save();
     return user;

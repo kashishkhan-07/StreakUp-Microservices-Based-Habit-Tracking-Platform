@@ -16,7 +16,17 @@ export const QUEUES = {
   NOTIFICATIONS_HABIT_COMPLETED: 'notifications.habit-completed',
 };
 
-export const createHabitCompletedEvent = ({ completionId, habitId, userId, date, streak = 1 }) => ({
+export const createHabitCompletedEvent = ({
+  completionId,
+  habitId,
+  userId,
+  date,
+  habitTitle = 'Habit',
+  habitCategory = 'General',
+  totalCompletedToday = 1,
+  habitTotalCompletions = 1,
+  streak = 1,
+}) => ({
   eventId: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
   eventType: ROUTING_KEYS.HABIT_COMPLETED,
   timestamp: new Date().toISOString(),
@@ -25,6 +35,29 @@ export const createHabitCompletedEvent = ({ completionId, habitId, userId, date,
     habitId,
     userId,
     date,
+    habitTitle,
+    habitCategory,
+    totalCompletedToday,
+    habitTotalCompletions,
     streak,
+  },
+});
+
+export const createHabitCreatedEvent = ({
+  habitId,
+  userId,
+  habitTitle,
+  habitCategory = 'General',
+  frequency = 'daily',
+}) => ({
+  eventId: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+  eventType: ROUTING_KEYS.HABIT_CREATED,
+  timestamp: new Date().toISOString(),
+  payload: {
+    habitId,
+    userId,
+    habitTitle,
+    habitCategory,
+    frequency,
   },
 });

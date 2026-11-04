@@ -12,8 +12,10 @@ import {
   ShieldCheck,
   Heart
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function TipsView() {
+  const { toast } = useToast();
   const [currentTrigger, setCurrentTrigger] = useState('Pouring my morning coffee');
   const [currentAction, setCurrentAction] = useState('Drink a tall glass of water');
   const [copied, setCopied] = useState(false);
@@ -85,6 +87,7 @@ export default function TipsView() {
     const text = `Habit Stack: After I [${currentTrigger}], I will [${currentAction}].`;
     navigator.clipboard.writeText(text);
     setCopied(true);
+    toast.success('Habit Stack formula copied to clipboard! 📋');
     setTimeout(() => setCopied(false), 2000);
   };
 

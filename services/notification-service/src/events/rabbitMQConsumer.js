@@ -1,6 +1,7 @@
 import amqp from 'amqplib';
 import { Notification } from '../models/Notification.js';
 import { EXCHANGES, QUEUES } from '../../../../shared/event-contracts/habitEvents.js';
+import { DuoNotificationEngine } from '../utils/duoNotificationEngine.js';
 
 export const startNotificationConsumer = async () => {
   const rabbitMQUrl = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
@@ -11,7 +12,7 @@ export const startNotificationConsumer = async () => {
     await channel.assertExchange(EXCHANGES.HABIT_EVENTS, 'topic', { durable: true });
     const q = await channel.assertQueue(QUEUES.NOTIFICATIONS_HABIT_COMPLETED, { durable: true });
 
-    // Bind queue to all habit event patterns
+    // Bind queue to all habit event patterns (completed and created)
     await channel.bindQueue(q.queue, EXCHANGES.HABIT_EVENTS, 'habit.*.v1');
 
     console.log(`👂 [Notification Service] Listening on RabbitMQ queue: ${QUEUES.NOTIFICATIONS_HABIT_COMPLETED}`);
@@ -23,15 +24,26 @@ export const startNotificationConsumer = async () => {
         const event = JSON.parse(msg.content.toString());
         console.log(`📥 [Event Received in Notification Service] ${event.eventType}:`, event.payload);
 
-        const { userId, date } = event.payload;
+        const { userId } = event.payload || {};
 
-        // Auto-create celebration notification in MongoDB
-        await Notification.create({
-          userId,
-          title: 'Habit Completed! 🎯',
-          message: `Awesome job! You marked your habit completed for ${date}. Keep the streak going!`,
-          type: 'milestone',
-        });
+        if (userId) {
+          // Generate rich Duolingo-style milestone / achievement data
+          const duoData = DuoNotificationEngine.generateNotification(event.eventType, event.payload);
+
+          // Save rich gamified notification in MongoDB
+          await Notification.create({
+            userId,
+            title: duoData.title,
+            message: duoData.message,
+            type: duoData.type,
+            icon: duoData.icon,
+            level: duoData.level,
+            xpEarned: duoData.xpEarned,
+            habitTitle: duoData.habitTitle,
+          });
+
+          console.log(`✨ [Duo Notification Created] for user ${userId}: "${duoData.title}" (${duoData.level || 'Milestone'})`);
+        }
 
         // Acknowledge message successfully processed
         channel.ack(msg);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings,
   User,
@@ -12,28 +12,60 @@ import {
   Sparkles,
   Sliders,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  Camera,
+  Image as ImageIcon,
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { playCompletionChime } from '../utils/soundEffects';
+import UserAvatar from './UserAvatar';
 
-const avatarPresets = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-  'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+const cartoonAvatarPresets = [
+  {
+    id: 'felix',
+    label: 'Adventurer',
+    url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Felix&backgroundColor=ffd5dc',
+  },
+  {
+    id: 'aneka',
+    label: 'Hero',
+    url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Aneka&backgroundColor=d1d4f9',
+  },
+  {
+    id: 'milo',
+    label: 'Scholar',
+    url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Milo&backgroundColor=c0aede',
+  },
+  {
+    id: 'sparky',
+    label: 'Robot',
+    url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Sparky&backgroundColor=ffdfbf',
+  },
+  {
+    id: 'lucky',
+    label: 'Cyber',
+    url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Lucky&backgroundColor=b6e3f4',
+  },
+  {
+    id: 'happy',
+    label: 'Emoji',
+    url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Happy&backgroundColor=ffd5dc',
+  },
 ];
 
 export default function SettingsView() {
   const { user, updateUser, logout } = useAuth();
+  const { toast, showConfirm } = useToast();
   const [name, setName] = useState(user?.name || '');
   const [timezone, setTimezone] = useState(user?.timezone || 'Asia/Kolkata');
-  const [avatar, setAvatar] = useState(user?.avatar || avatarPresets[0]);
+  const [avatar, setAvatar] = useState(user?.avatar || 'initials');
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const fileInputRef = useRef(null);
 
   // Preference Toggles (persisted locally)
   const [milestonesEnabled, setMilestonesEnabled] = useState(() => {
@@ -50,9 +82,60 @@ export default function SettingsView() {
     if (user) {
       setName(user.name || '');
       setTimezone(user.timezone || 'Asia/Kolkata');
-      setAvatar(user.avatar || avatarPresets[0]);
+      setAvatar(user.avatar || 'initials');
     }
   }, [user]);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file (PNG, JPG, WEBP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size should be under 10MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // High quality client-side crop & resize to 256x256
+        const canvas = document.createElement('canvas');
+        const maxSize = 256;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setAvatar(dataUrl);
+        toast.info('Photo selected! Click "Save Changes" to apply.');
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleToggle = (key, currentVal, setter) => {
     const nextVal = !currentVal;
@@ -65,8 +148,6 @@ export default function SettingsView() {
     if (!name.trim()) return;
 
     setSaving(true);
-    setSuccessMsg('');
-    setErrorMsg('');
 
     try {
       const res = await api.put('/auth/me', {
@@ -79,11 +160,10 @@ export default function SettingsView() {
         updateUser(res.data.data);
       }
 
-      setSuccessMsg('Profile updated successfully!');
-      setTimeout(() => setSuccessMsg(''), 3500);
+      toast.success('Profile updated successfully!');
     } catch (err) {
       console.error('Update profile error:', err);
-      setErrorMsg(err.response?.data?.message || 'Failed to update profile. Please try again.');
+      toast.error(err.response?.data?.message || 'Failed to update profile.', 'Save Failed');
     } finally {
       setSaving(false);
     }
@@ -131,30 +211,121 @@ export default function SettingsView() {
           </h3>
 
           <form onSubmit={handleSaveProfile} className="space-y-5">
-            {/* Avatar Selector */}
+            {/* Avatar Management: Live Preview + Media Upload + Cartoon Presets + Initials */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-2.5 uppercase tracking-wider">
-                Profile Avatar
+                Profile Photo & Avatar
               </label>
-              <div className="flex items-center gap-3">
-                {avatarPresets.map((imgUrl, i) => (
+
+              {/* Preview and Upload Action Card */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 mb-4">
+                <div className="relative inline-block self-start sm:self-auto group">
+                  <UserAvatar
+                    avatarUrl={avatar}
+                    name={name}
+                    size="xl"
+                    showRing
+                  />
                   <button
                     type="button"
-                    key={i}
-                    onClick={() => setAvatar(imgUrl)}
-                    className={`relative rounded-full transition-all duration-200 ${
-                      avatar === imgUrl
-                        ? 'ring-4 ring-blue-600 scale-110 shadow-md'
-                        : 'opacity-70 hover:opacity-100 hover:scale-105'
-                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 p-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md active:scale-95 transition"
+                    title="Upload photo from device"
                   >
-                    <img
-                      src={imgUrl}
-                      alt="Avatar preset"
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
+                    <Camera className="w-3.5 h-3.5" />
                   </button>
-                ))}
+                </div>
+
+                <div className="flex-1 min-w-[200px]">
+                  <h4 className="font-bold text-slate-900 text-sm">
+                    {avatar === 'initials'
+                      ? "Name's First Letter (Initial)"
+                      : avatar?.startsWith('data:')
+                      ? 'Custom Uploaded Photo'
+                      : 'Cartoon Avatar Preset'}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    Upload an image from your device, pick a cartoon character, or use your name's initial letter.
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-blue-600 hover:border-blue-300 shadow-xs transition"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Upload Photo</span>
+                    </button>
+
+                    {avatar !== 'initials' && (
+                      <button
+                        type="button"
+                        onClick={() => setAvatar('initials')}
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 transition"
+                      >
+                        Use First Letter
+                      </button>
+                    )}
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Cartoon Avatars & Initials Option Picker */}
+              <div>
+                <span className="block text-xs font-bold text-slate-500 mb-2.5 uppercase tracking-wide">
+                  Or Choose A Cartoon / Initial Style:
+                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Name Initial Option */}
+                  <button
+                    type="button"
+                    onClick={() => setAvatar('initials')}
+                    className={`flex flex-col items-center gap-1 p-1 rounded-2xl transition-all ${
+                      avatar === 'initials'
+                        ? 'ring-4 ring-blue-600 scale-105 shadow-md bg-blue-50/50'
+                        : 'opacity-80 hover:opacity-100 hover:scale-105'
+                    }`}
+                    title="Use first letter of your name"
+                  >
+                    <UserAvatar
+                      avatarUrl="initials"
+                      name={name}
+                      size="lg"
+                    />
+                    <span className="text-[10px] font-bold text-slate-600">Initial</span>
+                  </button>
+
+                  {/* Cartoon Character Presets */}
+                  {cartoonAvatarPresets.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset.id}
+                      onClick={() => setAvatar(preset.url)}
+                      className={`flex flex-col items-center gap-1 p-1 rounded-2xl transition-all ${
+                        avatar === preset.url
+                          ? 'ring-4 ring-blue-600 scale-105 shadow-md bg-blue-50/50'
+                          : 'opacity-80 hover:opacity-100 hover:scale-105'
+                      }`}
+                      title={preset.label}
+                    >
+                      <img
+                        src={preset.url}
+                        alt={preset.label}
+                        className="w-12 h-12 rounded-full object-cover bg-slate-100 border border-slate-200/80 shadow-xs"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600">{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -327,11 +498,16 @@ export default function SettingsView() {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Do you want to reload the application cache?')) {
-                    window.location.reload();
-                  }
+                  showConfirm({
+                    title: 'Reload App Cache?',
+                    message: 'This will refresh the page and clean up any temporary client session cache.',
+                    confirmText: 'Reload Now',
+                    cancelText: 'Cancel',
+                    isDestructive: false,
+                    onConfirm: () => window.location.reload(),
+                  });
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition active:scale-95"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Reload App Cache</span>
@@ -340,11 +516,16 @@ export default function SettingsView() {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Are you sure you want to log out of StreakUp?')) {
-                    logout();
-                  }
+                  showConfirm({
+                    title: 'Sign Out?',
+                    message: 'Are you sure you want to log out of StreakUp? You will need to sign in again to access your habits.',
+                    confirmText: 'Sign Out',
+                    cancelText: 'Stay Signed In',
+                    isDestructive: true,
+                    onConfirm: () => logout(),
+                  });
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition active:scale-95"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Sign Out</span>

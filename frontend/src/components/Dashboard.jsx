@@ -8,6 +8,7 @@ import ProgressChart from './ProgressChart';
 import AddHabitModal from './AddHabitModal';
 import EditHabitModal from './EditHabitModal';
 import NotificationDrawer from './NotificationDrawer';
+import UserAvatar from './UserAvatar';
 import { playCompletionChime, playUndoSound } from '../utils/soundEffects';
 
 // Dynamic Sub-views
@@ -19,9 +20,11 @@ import SettingsView from './SettingsView';
 
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { toast, showConfirm } = useToast();
   const [activeTab, setActiveTab] = useState('habits');
   const [search, setSearch] = useState('');
   
@@ -67,15 +70,24 @@ export default function Dashboard() {
       ]);
 
       if (habitsRes.data?.data) {
+        const rawMetrics = habitsRes.data.data.metrics || {};
+        const allHabits = habitsRes.data.data.all || [];
+        const activeHabitsCount = rawMetrics.activeHabits ?? rawMetrics.totalActive ?? allHabits.length;
+        const completedTodayCount = rawMetrics.completedToday ?? 0;
+        const progress = rawMetrics.todayProgress ?? rawMetrics.progressPercentage ?? (
+          activeHabitsCount > 0 ? Math.round((completedTodayCount / activeHabitsCount) * 100) : 0
+        );
+        const leftCount = rawMetrics.leftToday ?? Math.max(0, activeHabitsCount - completedTodayCount);
+
         setHabitsData({
-          all: habitsRes.data.data.all || [],
+          all: allHabits,
           positiveHabits: habitsRes.data.data.positiveHabits || [],
           negativeHabits: habitsRes.data.data.negativeHabits || [],
-          metrics: habitsRes.data.data.metrics || {
-            todayProgress: 0,
-            activeHabits: 0,
-            completedToday: 0,
-            leftToday: 0,
+          metrics: {
+            todayProgress: progress,
+            activeHabits: activeHabitsCount,
+            completedToday: completedTodayCount,
+            leftToday: leftCount,
           },
         });
       }
@@ -112,23 +124,34 @@ export default function Dashboard() {
       const res = await api.post(`/habits/${habitId}/toggle`, { date: selectedDate });
       if (res.data?.data?.completed) {
         playCompletionChime();
+        const habitCheers = [
+          '🔥 "Boom! Habit crushed successfully!" ✨',
+          '⚡ "Level Up! Consistency is compounding!" 🚀',
+          '🎯 "Target acquired & destroyed! Beast mode on!" 💪',
+          '✨ "Discipline unlocked! Future you is smiling!" 🌟',
+          '🏆 "Streak protected! Outstanding momentum!" 🚀',
+        ];
+        const randomCheer = habitCheers[Math.floor(Math.random() * habitCheers.length)];
+        toast.success(randomCheer, 'Habit Completed!');
       } else {
         playUndoSound();
+        toast.info('Habit marked as incomplete', 'Progress Reset');
       }
       loadData(selectedDate);
     } catch (err) {
       console.error('Failed to toggle habit:', err.message);
+      toast.error(err.response?.data?.message || err.message, 'Action Failed');
     }
   };
 
   const handleCreateHabit = async (newHabit) => {
     try {
       const res = await api.post('/habits', newHabit);
-      console.log('Habit created successfully in MongoDB:', res.data);
+      toast.success(`Habit "${newHabit.title}" created successfully! 🎯`);
       await loadData(selectedDate);
     } catch (err) {
       console.error('Failed to create habit:', err);
-      alert('Habit Save Error: ' + (err.response?.data?.message || err.message));
+      toast.error(err.response?.data?.message || err.message, 'Failed to Create Habit');
     }
   };
 
@@ -140,23 +163,32 @@ export default function Dashboard() {
   const handleUpdateHabit = async (habitId, updatedData) => {
     try {
       await api.put(`/habits/${habitId}`, updatedData);
-      console.log('Habit updated successfully:', habitId);
+      toast.success('Habit updated successfully!');
       await loadData(selectedDate);
     } catch (err) {
       console.error('Failed to update habit:', err);
-      alert('Update Error: ' + (err.response?.data?.message || err.message));
+      toast.error(err.response?.data?.message || err.message, 'Update Failed');
     }
   };
 
-  const handleDeleteHabit = async (habitId) => {
-    try {
-      await api.delete(`/habits/${habitId}`);
-      console.log('Habit deleted successfully:', habitId);
-      await loadData(selectedDate);
-    } catch (err) {
-      console.error('Failed to delete habit:', err);
-      alert('Delete Error: ' + (err.response?.data?.message || err.message));
-    }
+  const handleDeleteHabit = (habitId, habitTitle) => {
+    showConfirm({
+      title: 'Delete Habit?',
+      message: `Are you sure you want to delete "${habitTitle || 'this habit'}"? Associated streaks and completion logs will be permanently deleted.`,
+      confirmText: 'Delete Habit',
+      cancelText: 'Keep Habit',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/habits/${habitId}`);
+          toast.success(`"${habitTitle || 'Habit'}" deleted successfully.`);
+          await loadData(selectedDate);
+        } catch (err) {
+          console.error('Failed to delete habit:', err);
+          toast.error(err.response?.data?.message || err.message, 'Delete Failed');
+        }
+      },
+    });
   };
 
   const filterHabits = (list) => {
@@ -210,11 +242,7 @@ export default function Dashboard() {
               )}
             </button>
 
-            <img
-              src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-              alt="Profile"
-              className="w-9 h-9 rounded-full object-cover border-2 border-yellow-300 shadow-sm"
-            />
+            <UserAvatar user={user} size="sm" />
           </div>
         </div>
 
@@ -235,11 +263,7 @@ export default function Dashboard() {
             <span className="text-sm font-bold text-slate-700">
               {user?.name}
             </span>
-            <img
-              src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-              alt="Profile"
-              className="w-10 h-10 rounded-full object-cover border-2 border-yellow-300 ring-2 ring-white shadow-sm"
-            />
+            <UserAvatar user={user} size="md" />
           </div>
         </header>
 

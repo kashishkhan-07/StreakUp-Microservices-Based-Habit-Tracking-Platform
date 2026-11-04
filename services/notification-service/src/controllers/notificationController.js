@@ -28,3 +28,30 @@ export const markAsRead = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const markAllAsRead = async (req, res) => {
+  try {
+    await Notification.updateMany({ userId: req.user.id, isRead: false }, { isRead: true });
+    res.status(200).json({ success: true, message: 'All notifications marked as read' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteNotification = async (req, res) => {
+  try {
+    await Notification.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    res.status(200).json({ success: true, message: 'Notification deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const clearAllNotifications = async (req, res) => {
+  try {
+    await Notification.deleteMany({ userId: req.user.id });
+    res.status(200).json({ success: true, message: 'All notifications cleared' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

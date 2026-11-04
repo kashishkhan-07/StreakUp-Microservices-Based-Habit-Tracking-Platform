@@ -2,12 +2,10 @@ import React from 'react';
 import { PieChart, Zap, CheckCircle2, Hourglass } from 'lucide-react';
 
 export default function MetricCards({ metrics = {} }) {
-  const {
-    todayProgress = 0,
-    activeHabits = 0,
-    completedToday = 0,
-    leftToday = 0,
-  } = metrics;
+  const todayProgress = metrics.todayProgress ?? metrics.progressPercentage ?? 0;
+  const activeHabits = metrics.activeHabits ?? metrics.totalActive ?? 0;
+  const completedToday = metrics.completedToday ?? 0;
+  const leftToday = metrics.leftToday ?? Math.max(0, activeHabits - completedToday);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
