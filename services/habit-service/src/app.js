@@ -17,6 +17,7 @@ app.get('/health', (req, res) => {
 
 // Mount routes
 app.use('/api/habits', habitRoutes);
+app.use('/', habitRoutes);
 
 // Error handling
 app.use(errorHandler);

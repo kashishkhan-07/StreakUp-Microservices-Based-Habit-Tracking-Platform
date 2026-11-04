@@ -17,6 +17,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/analytics', analyticsRoutes);
+app.use('/', analyticsRoutes);
 
 // Error middleware
 app.use(errorHandler);

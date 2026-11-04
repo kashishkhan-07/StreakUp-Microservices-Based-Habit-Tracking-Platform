@@ -45,6 +45,10 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  const updateUser = (updatedData) => {
+    setUser((prev) => ({ ...prev, ...updatedData }));
+  };
+
   const logout = () => {
     localStorage.removeItem('streakup_token');
     setToken(null);
@@ -52,7 +56,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

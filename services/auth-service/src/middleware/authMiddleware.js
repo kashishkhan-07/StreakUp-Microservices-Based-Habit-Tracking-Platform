@@ -1,5 +1,8 @@
 import jwt from 'jsonwebtoken';
 
+// 🔒 Same guaranteed master secret
+const JWT_SECRET = process.env.JWT_SECRET || 'streakup_super_secret_jwt_key_2026_dev';
+
 export const protect = async (req, res, next) => {
   try {
     let token;
@@ -16,7 +19,7 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded; // { id, email, name, timezone }
     next();
   } catch (error) {

@@ -4,16 +4,13 @@ import { authLimiter } from '../middleware/rateLimiter.js';
 import { authenticateAndForwardUser } from '../middleware/authGuard.js';
 
 export const setupProxies = (app) => {
-  // 1. Auth Service Routes
+  // 1. Auth Service Routes (Public)
   app.use(
     '/api/auth',
     authLimiter,
     createProxyMiddleware({
       target: config.services.auth,
       changeOrigin: true,
-      pathRewrite: {
-        '^/api/auth': '/api/auth',
-      },
     })
   );
 
@@ -24,8 +21,19 @@ export const setupProxies = (app) => {
     createProxyMiddleware({
       target: config.services.habits,
       changeOrigin: true,
-      pathRewrite: {
-        '^/api/habits': '/api/habits',
+      on: {
+        proxyReq: (proxyReq, req) => {
+          // Forward user headers
+          if (req.headers['x-user-id']) {
+            proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          }
+          if (req.headers['x-user-email']) {
+            proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
+          }
+          if (req.headers['authorization']) {
+            proxyReq.setHeader('authorization', req.headers['authorization']);
+          }
+        },
       },
     })
   );
@@ -37,8 +45,15 @@ export const setupProxies = (app) => {
     createProxyMiddleware({
       target: config.services.analytics,
       changeOrigin: true,
-      pathRewrite: {
-        '^/api/analytics': '/api/analytics',
+      on: {
+        proxyReq: (proxyReq, req) => {
+          if (req.headers['x-user-id']) {
+            proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          }
+          if (req.headers['authorization']) {
+            proxyReq.setHeader('authorization', req.headers['authorization']);
+          }
+        },
       },
     })
   );
@@ -50,8 +65,15 @@ export const setupProxies = (app) => {
     createProxyMiddleware({
       target: config.services.notifications,
       changeOrigin: true,
-      pathRewrite: {
-        '^/api/notifications': '/api/notifications',
+      on: {
+        proxyReq: (proxyReq, req) => {
+          if (req.headers['x-user-id']) {
+            proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          }
+          if (req.headers['authorization']) {
+            proxyReq.setHeader('authorization', req.headers['authorization']);
+          }
+        },
       },
     })
   );

@@ -17,6 +17,7 @@ app.get('/health', (req, res) => {
 
 // Core routes
 app.use('/api/auth', authRoutes);
+app.use('/', authRoutes);
 
 // Error middleware
 app.use(errorHandler);

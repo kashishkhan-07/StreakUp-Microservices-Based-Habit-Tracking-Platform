@@ -18,12 +18,13 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/notifications', notificationRoutes);
+app.use('/', notificationRoutes);
 
 const PORT = process.env.PORT || 5004;
 
 const startServer = async () => {
   await connectDB();
-  await startNotificationConsumer();
+  startNotificationConsumer().catch((err) => console.warn('RabbitMQ consumer warning:', err.message));
   app.listen(PORT, () => {
     console.log(`🚀 [Notification Service] Running on http://localhost:${PORT}`);
   });

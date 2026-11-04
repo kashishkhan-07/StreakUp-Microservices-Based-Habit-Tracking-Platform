@@ -15,4 +15,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Only clear token if an authenticated endpoint fails with 401 (not during login/register)
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      !error.config?.url?.includes('/auth/login') &&
+      !error.config?.url?.includes('/auth/register')
+    ) {
+      console.warn('Authentication token invalid or expired. Clearing stored token.');
+      localStorage.removeItem('streakup_token');
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

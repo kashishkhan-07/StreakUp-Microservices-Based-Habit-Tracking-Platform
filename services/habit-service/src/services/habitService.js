@@ -1,12 +1,14 @@
 import { Habit } from '../models/Habit.js';
 import { Completion } from '../models/Completion.js';
+import { publishEvent } from '../events/rabbitMQPublisher.js';
+import { createHabitCompletedEvent, ROUTING_KEYS } from '../../../../shared/event-contracts/habitEvents.js';
 
 export class HabitService {
-  // Get all active habits for a user, enriched with today's completion status
+  // Get all active habits for a user, enriched with completion status
   static async getUserHabitsWithTodayStatus(userId, todayDate) {
     const habits = await Habit.find({ userId, isArchived: false }).sort({ createdAt: -1 });
 
-    // Fetch all completions for this user on today's date
+    // Fetch completions for this user on the requested date
     const todayCompletions = await Completion.find({
       userId,
       date: todayDate,
@@ -14,7 +16,6 @@ export class HabitService {
 
     const completedHabitIds = new Set(todayCompletions.map((c) => c.habitId.toString()));
 
-    // Separate habits into Positive and Negative categories (matching the UI design)
     const positiveHabits = [];
     const negativeHabits = [];
 
@@ -83,6 +84,14 @@ export class HabitService {
 
   // Toggle completion: Complete or Undo completion for a given date
   static async toggleCompletion(habitId, userId, date) {
+    // 🔒 STRICT RULE: Prevent completing habits for future dates!
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date > todayStr) {
+      const error = new Error('Cannot complete habits for future dates! Focus on today.');
+      error.status = 400;
+      throw error;
+    }
+
     const habit = await Habit.findOne({ _id: habitId, userId, isArchived: false });
     if (!habit) {
       const error = new Error('Active habit not found or unauthorized');
@@ -102,12 +111,33 @@ export class HabitService {
         message: 'Habit marked as incomplete',
       };
     } else {
-      // Mark as completed
+      // Mark as completed in MongoDB
       const completion = await Completion.create({
         habitId,
         userId,
         date,
       });
+
+      // 🚀 Publish HabitCompleted event to RabbitMQ (Safe Non-blocking)
+      try {
+        if (typeof publishEvent === 'function') {
+          const event = createHabitCompletedEvent ? createHabitCompletedEvent({
+            completionId: completion._id.toString(),
+            habitId: habit._id.toString(),
+            userId,
+            date,
+          }) : {
+            eventId: `evt_${Date.now()}`,
+            eventType: 'habit.completed.v1',
+            payload: { completionId: completion._id, habitId, userId, date }
+          };
+
+          const routingKey = ROUTING_KEYS?.HABIT_COMPLETED || 'habit.completed.v1';
+          publishEvent(routingKey, event);
+        }
+      } catch (eventErr) {
+        console.warn('⚠️ RabbitMQ publish skipped:', eventErr.message);
+      }
 
       return {
         completed: true,
@@ -119,7 +149,7 @@ export class HabitService {
     }
   }
 
-  // Get completion history for a habit or across all user habits
+  // Get completion history
   static async getCompletions(userId, { habitId, startDate, endDate }) {
     const filter = { userId };
     if (habitId) filter.habitId = habitId;
